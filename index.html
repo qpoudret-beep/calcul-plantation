@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Calcul plantation</title>
+<meta name="theme-color" content="#2f5d45">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Source+Sans+3:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+html{-webkit-text-size-adjust:100%}
+[hidden]{display:none!important}
+/* Layout : colonne fiche chantier — total en tête, massifs, palette, fournitures, récapitulatif */
+:root{
+  --bg:#f3f5f1; --surface:#ffffff; --fg:#1d2a22; --muted:#5d6b62; --line:#d7ddd6;
+  --pine:#2f5d45; --sand:#b8924c; --focus:#2f6f9f; --ok:#2f7a4a; --warn:#a8620c; --crit:#b23b2a;
+  --okbg:#e3f1e7; --warnbg:#fbf0de; --tint:#eef2ec;
+  --display:"Bricolage Grotesque",system-ui,sans-serif;
+  --body:"Source Sans 3",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#121915; --surface:#1b241f; --fg:#e4ebe5; --muted:#9aa8a0; --line:#2e3a33;
+  --pine:#7fbf9a; --sand:#d8bb82; --focus:#79b3dc; --ok:#7fcf98; --warn:#e5a54d; --crit:#ef8a78;
+  --okbg:#1d3326; --warnbg:#3a2c16; --tint:#202b25; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121915; --surface:#1b241f; --fg:#e4ebe5; --muted:#9aa8a0; --line:#2e3a33;
+  --pine:#7fbf9a; --sand:#d8bb82; --focus:#79b3dc; --ok:#7fcf98; --warn:#e5a54d; --crit:#ef8a78;
+  --okbg:#1d3326; --warnbg:#3a2c16; --tint:#202b25; color-scheme:dark}
+body{margin:0;padding-top:max(20px,env(safe-area-inset-top,0px))!important;background:var(--bg);color:var(--fg);font:16px/1.5 var(--body);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
+.wrap{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+h1{font:700 1.7rem/1.1 var(--display);margin:0;color:var(--pine);text-wrap:balance}
+h2{font:600 1.1rem/1.2 var(--display);margin:0}
+h3{font:600 1rem/1.2 var(--display);margin:0}
+.sub{color:var(--muted);margin:4px 0 0;font-size:.95rem}
+.box{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;min-width:0;display:flex;flex-direction:column;gap:12px}
+.head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.totaux{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;background:var(--pine);color:var(--bg);border-radius:10px;padding:16px}
+.totaux .k{font-size:.7rem;letter-spacing:.07em;text-transform:uppercase;opacity:.85}
+.totaux .v{font:500 1.3rem var(--mono);font-variant-numeric:tabular-nums}
+.totaux .v small{font-size:.75rem;opacity:.85}
+label.f{display:flex;flex-direction:column;gap:3px;font-size:.78rem;color:var(--muted);min-width:0}
+input.t{font:inherit;font-size:1rem;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:7px 8px;width:100%;box-sizing:border-box;min-width:0}
+input.n{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
+input.t:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.grid2{display:grid;grid-template-columns:2fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+button{font:600 .92rem var(--body);padding:8px 12px;border-radius:8px;border:1px solid var(--pine);background:var(--pine);color:var(--bg);cursor:pointer}
+button.ghost{background:transparent;color:var(--pine)}
+button.del{background:transparent;border-color:var(--line);color:var(--muted);padding:6px 10px}
+button.confirm{background:var(--crit);border-color:var(--crit);color:var(--bg)}
+.row{display:flex;flex-wrap:wrap;gap:8px}
+details.massif{border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+details.massif>summary{list-style:none;cursor:pointer;padding:12px 14px;display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+details.massif>summary::-webkit-details-marker{display:none}
+details.massif>summary .nm{font:600 1rem var(--display)}
+details.massif>summary .meta{font:500 .85rem var(--mono);color:var(--muted);white-space:nowrap}
+details.massif>summary .nm::before{content:"▸ ";color:var(--muted)}
+details.massif[open]>summary .nm::before{content:"▾ "}
+.mbody{padding:0 14px 14px;display:flex;flex-direction:column;gap:12px}
+.rep{display:flex;flex-direction:column}
+.rep .r{display:grid;grid-template-columns:1fr 5.2em 5.5em;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)}
+.rep .r:last-child{border-bottom:0}
+.rep .r .pn{min-width:0;overflow-wrap:anywhere;font-size:.95rem}
+.rep .r .q{font:500 .95rem var(--mono);text-align:right;font-variant-numeric:tabular-nums}
+.rep .hd{font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:0 0 4px}
+.pct{position:relative}
+.pct input{padding-right:22px}
+.pct::after{content:"%";position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:.85rem;color:var(--muted);pointer-events:none}
+.badge{display:inline-block;font-size:.78rem;font-weight:600;padding:2px 8px;border-radius:99px}
+.badge.ok{background:var(--okbg);color:var(--ok)} .badge.warn{background:var(--warnbg);color:var(--warn)}
+.plante{display:grid;grid-template-columns:1.6fr .8fr .7fr .8fr auto;gap:8px;align-items:end;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.plante:last-of-type{border-bottom:0}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:7px 6px;border-bottom:1px solid var(--line);font-size:.92rem}
+th{font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+td.n,th.n{text-align:right;white-space:nowrap} td.n{font-family:var(--mono)}
+tr.tot td{font-weight:600;border-bottom:0} tr.ttc td{font:600 1.05rem var(--display);color:var(--pine);border-top:2px solid var(--pine)}
+tr.sec td{background:var(--tint);font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.note{font-size:.85rem;color:var(--muted);margin:0}
+.ex{font-size:.85rem;background:var(--warnbg);color:var(--fg);padding:8px 10px;border-radius:8px;margin:0}
+@media (max-width:520px){
+  .grid3{grid-template-columns:1fr 1fr}
+  .plante{grid-template-columns:1fr 1fr 1fr}
+  .plante .pnom{grid-column:1/-1}
+  .plante .del{grid-column:3;justify-self:end}
+  .totaux .v{font-size:1.1rem}
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>Calcul plantation</h1>
+    <p class="sub">Quantités de plants, paillage, amendement et estimatif d'un projet de massifs</p>
+  </header>
+
+  <section class="box">
+    <label class="f">Nom du projet<input class="t" id="nomProjet" data-b="nom" type="text"></label>
+  </section>
+
+  <div class="totaux" aria-live="polite">
+    <div><div class="k">Surface</div><div class="v" id="tSurf">–</div></div>
+    <div><div class="k">Plants</div><div class="v" id="tPlants">–</div></div>
+    <div><div class="k">Total TTC</div><div class="v" id="tTtc">–</div></div>
+  </div>
+
+  <section class="box">
+    <div class="head"><h2>Massifs</h2><button type="button" class="ghost" id="addMassif">+ Ajouter un massif</button></div>
+    <p class="note">Pour chaque massif, indiquez la part de surface occupée par chaque plante. Le total doit faire 100 %.</p>
+    <div id="massifs" style="display:flex;flex-direction:column;gap:10px"></div>
+  </section>
+
+  <section class="box">
+    <div class="head"><h2>Palette végétale</h2><button type="button" class="ghost" id="addPlante">+ Ajouter une plante</button></div>
+    <p class="ex" id="avertPrix">Prix d'exemple : remplacez-les par ceux de votre fournisseur.</p>
+    <div id="palette" style="display:flex;flex-direction:column;gap:10px"></div>
+  </section>
+
+  <section class="box">
+    <h2>Fournitures et paramètres</h2>
+    <h3>Paillage</h3>
+    <div class="grid3">
+      <label class="f">Type<input class="t" type="text" id="pType" data-b="paillage.type"></label>
+      <label class="f">Épaisseur (cm)<input class="t n" inputmode="decimal" id="pEp" data-b="paillage.ep"></label>
+      <label class="f">Prix HT (€/m³)<input class="t n" inputmode="decimal" id="pPrix" data-b="paillage.prix"></label>
+    </div>
+    <h3>Amendement / terreau</h3>
+    <div class="grid3">
+      <label class="f">Type<input class="t" type="text" id="aType" data-b="amend.type"></label>
+      <label class="f">Épaisseur (cm)<input class="t n" inputmode="decimal" id="aEp" data-b="amend.ep"></label>
+      <label class="f">Prix HT (€/m³)<input class="t n" inputmode="decimal" id="aPrix" data-b="amend.prix"></label>
+    </div>
+    <h3>Chantier</h3>
+    <div class="grid3">
+      <label class="f">Marge de perte plants (%)<input class="t n" inputmode="decimal" id="perte" data-b="perte"></label>
+      <label class="f">Arrosage plantation (L/plant)<input class="t n" inputmode="decimal" id="eau" data-b="eau"></label>
+      <label class="f">Temps de plantation (min/plant)<input class="t n" inputmode="decimal" id="minPlant" data-b="minPlant"></label>
+      <label class="f">Coût horaire MO (€/h, 0 = non compté)<input class="t n" inputmode="decimal" id="tauxH" data-b="tauxH"></label>
+      <label class="f">TVA (%)<input class="t n" inputmode="decimal" id="tva" data-b="tva"></label>
+    </div>
+    <p class="note">Le volume de paillage inclut 15 % de tassement.</p>
+  </section>
+
+  <section class="box">
+    <div class="head"><h2>Récapitulatif</h2><button type="button" id="copier">Copier pour Excel</button></div>
+    <div class="scroll"><table id="recap"></table></div>
+    <div class="scroll"><table id="recapMassifs"></table></div>
+    <p class="note" id="infosChantier"></p>
+  </section>
+
+  <section class="box">
+    <h2>Projet</h2>
+    <div class="row">
+      <button type="button" class="ghost" id="nouveau">Nouveau projet vide</button>
+      <button type="button" class="ghost" id="exemple">Recharger l'exemple</button>
+    </div>
+    <p class="note">Le projet est enregistré automatiquement sur ce téléphone.</p>
+  </section>
+</div>
+
+<script>
+const PALETTE_EX=[
+  {id:"p1",nom:"Cistus × pulverulentus 'Sunset'",dens:3,cond:"C3",prix:7.5},
+  {id:"p2",nom:"Pittosporum tobira 'Nana'",dens:1.5,cond:"C4",prix:12},
+  {id:"p3",nom:"Santolina chamaecyparissus",dens:5,cond:"C2",prix:4.5},
+  {id:"p4",nom:"Perovskia 'Blue Spire'",dens:4,cond:"C2",prix:5},
+  {id:"p5",nom:"Salvia nemorosa",dens:5,cond:"C2",prix:4.5},
+  {id:"p6",nom:"Nepeta × faassenii",dens:5,cond:"C2",prix:4.2},
+  {id:"p7",nom:"Stipa tenuissima",dens:7,cond:"C2",prix:3.8}
+];
+function exemple(){
+  return {nom:"Pôle social – exemple",perte:5,eau:10,minPlant:6,tauxH:0,tva:20,
+    paillage:{type:"Écorce de pin",ep:7,prix:40},
+    amend:{type:"Terreau de plantation",ep:3,prix:55},
+    plantes:JSON.parse(JSON.stringify(PALETTE_EX)),
+    massifs:[{id:"m1",nom:"Massif 3",surface:110.52,rep:{p1:20,p2:15,p3:15,p4:15,p5:10,p6:10,p7:15}}],
+    seq:10,exemple:true};
+}
+function vide(){
+  return {nom:"Nouveau projet",perte:5,eau:10,minPlant:6,tauxH:0,tva:20,
+    paillage:{type:"Écorce de pin",ep:7,prix:0},amend:{type:"Terreau",ep:3,prix:0},
+    plantes:[],massifs:[{id:"m1",nom:"Massif 1",surface:0,rep:{}}],seq:2,exemple:false};
+}
+const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+let S;
+try{S=JSON.parse(store.get("projet")||"null")}catch(e){S=null}
+if(!S||!S.massifs) S=exemple();
+const save=()=>store.set("projet",JSON.stringify(S));
+
+const $=id=>document.getElementById(id);
+const num=v=>{const n=parseFloat(String(v??"").replace(",","."));return isNaN(n)?0:n};
+const fmt=(n,d=1)=>n.toLocaleString("fr-FR",{minimumFractionDigits:d,maximumFractionDigits:d});
+const eur=n=>n.toLocaleString("fr-FR",{style:"currency",currency:"EUR"});
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const nid=p=>p+(S.seq++);
+
+/* ---------- Rendu des champs (structure) ---------- */
+function rendreParams(){
+  document.querySelectorAll("[data-b]").forEach(el=>{
+    const v=el.dataset.b.split(".").reduce((o,k)=>o?.[k],S);
+    el.value=typeof v==="number"?String(v).replace(".",","):(v??"");
+  });
+  $("avertPrix").hidden=!S.exemple;
+}
+function rendreMassifs(){
+  $("massifs").innerHTML=S.massifs.map((m,i)=>`
+    <details class="massif" ${i===S.massifs.length-1||S.massifs.length<3?"open":""}>
+      <summary><span class="nm" id="mn-${m.id}">${esc(m.nom)}</span><span class="meta" id="mm-${m.id}"></span></summary>
+      <div class="mbody">
+        <div class="grid2">
+          <label class="f">Nom<input class="t" type="text" id="nom-${m.id}" data-m="${m.id}" data-k="nom" value="${esc(m.nom)}"></label>
+          <label class="f">Surface (m²)<input class="t n" inputmode="decimal" id="surf-${m.id}" data-m="${m.id}" data-k="surface" value="${String(m.surface).replace(".",",")}"></label>
+        </div>
+        ${S.plantes.length?`<div class="rep">
+          <div class="r hd"><span>Plante</span><span style="text-align:right">Part</span><span style="text-align:right">Plants</span></div>
+          ${S.plantes.map(p=>`<div class="r"><span class="pn">${esc(p.nom)||"<i>Sans nom</i>"}</span>
+            <span class="pct"><input class="t n" inputmode="decimal" id="r-${m.id}-${p.id}" data-m="${m.id}" data-p="${p.id}" value="${m.rep[p.id]?String(m.rep[p.id]).replace(".",","):""}" placeholder="0" aria-label="Part de ${esc(p.nom)} dans ${esc(m.nom)}"></span>
+            <span class="q" id="q-${m.id}-${p.id}">–</span></div>`).join("")}
+        </div>`:`<p class="note">Ajoutez d'abord des plantes dans la palette.</p>`}
+        <div class="head"><span id="t-${m.id}"></span>
+          <span class="row"><button type="button" class="ghost" data-act="egal" data-m="${m.id}">Répartir également</button>
+          ${S.massifs.length>1?`<button type="button" class="del" data-act="delM" data-m="${m.id}">Supprimer</button>`:""}</span></div>
+      </div>
+    </details>`).join("");
+}
+function rendrePalette(){
+  $("palette").innerHTML=S.plantes.length?S.plantes.map(p=>`
+    <div class="plante">
+      <label class="f pnom">Plante<input class="t" type="text" id="pn-${p.id}" data-p="${p.id}" data-k="nom" value="${esc(p.nom)}"></label>
+      <label class="f">Densité /m²<input class="t n" inputmode="decimal" id="pd-${p.id}" data-p="${p.id}" data-k="dens" value="${String(p.dens).replace(".",",")}"></label>
+      <label class="f">Godet<input class="t" type="text" id="pc-${p.id}" data-p="${p.id}" data-k="cond" value="${esc(p.cond)}"></label>
+      <label class="f">Prix HT €<input class="t n" inputmode="decimal" id="pp-${p.id}" data-p="${p.id}" data-k="prix" value="${String(p.prix).replace(".",",")}"></label>
+      <button type="button" class="del" data-act="delP" data-p="${p.id}" aria-label="Supprimer ${esc(p.nom)}">✕</button>
+    </div>`).join(""):`<p class="note">Aucune plante. Touchez « Ajouter une plante ».</p>`;
+}
+function toutRendre(){rendreParams();rendrePalette();rendreMassifs();calc()}
+
+/* ---------- Calcul ---------- */
+function calcul(){
+  const perte=num(S.perte)/100;
+  const parPlante={}; S.plantes.forEach(p=>parPlante[p.id]=0);
+  const massifs=S.massifs.map(m=>{
+    const surf=num(m.surface); let tot=0,n=0;const q={};
+    S.plantes.forEach(p=>{
+      const pc=num(m.rep[p.id]); tot+=pc;
+      const qq=pc>0?Math.ceil(surf*pc/100*num(p.dens)*(1+perte)):0;
+      q[p.id]=qq; n+=qq; parPlante[p.id]+=qq;
+    });
+    return {m,surf,tot,n,q};
+  });
+  const surf=massifs.reduce((a,x)=>a+x.surf,0);
+  const nPlants=massifs.reduce((a,x)=>a+x.n,0);
+  const lignes=S.plantes.filter(p=>parPlante[p.id]>0).map(p=>({p,q:parPlante[p.id],ht:parPlante[p.id]*num(p.prix)}));
+  const htPlants=lignes.reduce((a,l)=>a+l.ht,0);
+  const vPaill=surf*num(S.paillage.ep)/100*1.15, htPaill=vPaill*num(S.paillage.prix);
+  const vAmend=surf*num(S.amend.ep)/100, htAmend=vAmend*num(S.amend.prix);
+  const heures=nPlants*num(S.minPlant)/60, htMO=heures*num(S.tauxH);
+  const ht=htPlants+htPaill+htAmend+htMO, tva=ht*num(S.tva)/100;
+  return {massifs,surf,nPlants,lignes,htPlants,vPaill,htPaill,vAmend,htAmend,heures,htMO,ht,tva,ttc:ht+tva,eau:nPlants*num(S.eau)};
+}
+let dernier=null;
+function calc(){
+  const R=calcul(); dernier=R;
+  $("tSurf").innerHTML=`${fmt(R.surf,2)} <small>m²</small>`;
+  $("tPlants").textContent=R.nPlants.toLocaleString("fr-FR");
+  $("tTtc").textContent=eur(R.ttc);
+  R.massifs.forEach(x=>{
+    const id=x.m.id;
+    $("mn-"+id).textContent=x.m.nom||"Sans nom";
+    $("mm-"+id).textContent=`${fmt(x.surf,2)} m² · ${x.n} plants`;
+    S.plantes.forEach(p=>{const e=$(`q-${id}-${p.id}`);if(e)e.textContent=x.q[p.id]?x.q[p.id]:"–"});
+    const ok=Math.abs(x.tot-100)<0.01;
+    $("t-"+id).innerHTML=`<span class="badge ${ok?"ok":"warn"}">Total ${fmt(x.tot,0)} %${ok?"":x.tot<100?` · il manque ${fmt(100-x.tot,0)} %`:` · ${fmt(x.tot-100,0)} % en trop`}</span>`;
+  });
+  let h=`<thead><tr><th>Poste</th><th class="n">Quantité</th><th class="n">P.U. HT</th><th class="n">Total HT</th></tr></thead><tbody>`;
+  h+=`<tr class="sec"><td colspan="4">Végétaux</td></tr>`;
+  h+=R.lignes.length?R.lignes.map(l=>`<tr><td>${esc(l.p.nom)} <span class="note">${esc(l.p.cond)}</span></td><td class="n">${l.q}</td><td class="n">${eur(num(l.p.prix))}</td><td class="n">${eur(l.ht)}</td></tr>`).join(""):`<tr><td colspan="4" class="note">Aucun plant calculé.</td></tr>`;
+  h+=`<tr class="sec"><td colspan="4">Fournitures</td></tr>`;
+  h+=`<tr><td>${esc(S.paillage.type)} (${fmt(num(S.paillage.ep),0)} cm)</td><td class="n">${fmt(R.vPaill,2)} m³</td><td class="n">${eur(num(S.paillage.prix))}</td><td class="n">${eur(R.htPaill)}</td></tr>`;
+  h+=`<tr><td>${esc(S.amend.type)} (${fmt(num(S.amend.ep),0)} cm)</td><td class="n">${fmt(R.vAmend,2)} m³</td><td class="n">${eur(num(S.amend.prix))}</td><td class="n">${eur(R.htAmend)}</td></tr>`;
+  if(num(S.tauxH)>0) h+=`<tr><td>Main-d'œuvre plantation</td><td class="n">${fmt(R.heures,1)} h</td><td class="n">${eur(num(S.tauxH))}</td><td class="n">${eur(R.htMO)}</td></tr>`;
+  h+=`<tr class="tot"><td colspan="3">Total HT</td><td class="n">${eur(R.ht)}</td></tr>`;
+  h+=`<tr><td colspan="3">TVA ${fmt(num(S.tva),1)} %</td><td class="n">${eur(R.tva)}</td></tr>`;
+  h+=`<tr class="ttc"><td colspan="3">Total TTC</td><td class="n">${eur(R.ttc)}</td></tr></tbody>`;
+  $("recap").innerHTML=h;
+  $("recapMassifs").innerHTML=`<thead><tr><th>Massif</th><th class="n">Surface</th><th class="n">Plants</th><th class="n">Paillage</th></tr></thead><tbody>`+
+    R.massifs.map(x=>`<tr><td>${esc(x.m.nom)}</td><td class="n">${fmt(x.surf,2)} m²</td><td class="n">${x.n}</td><td class="n">${fmt(x.surf*num(S.paillage.ep)/100*1.15,2)} m³</td></tr>`).join("")+`</tbody>`;
+  $("infosChantier").textContent=`Arrosage de plantation : environ ${Math.round(R.eau).toLocaleString("fr-FR")} L. Temps de plantation estimé : ${fmt(R.heures,1)} h, soit environ ${fmt(R.heures/7,1)} jours à une personne (7 h/jour).`;
+}
+
+/* ---------- Saisie ---------- */
+document.addEventListener("input",e=>{
+  const el=e.target;
+  if(el.dataset.b){
+    const ks=el.dataset.b.split("."),last=ks.pop();
+    const o=ks.reduce((a,k)=>a[k],S);
+    o[last]=(el.type==="text"&&!el.inputMode)?el.value:num(el.value);
+    if(["paillage.prix","amend.prix"].includes(el.dataset.b)) S.exemple=false;
+  }else if(el.dataset.m&&el.dataset.p){
+    S.massifs.find(m=>m.id===el.dataset.m).rep[el.dataset.p]=num(el.value);
+  }else if(el.dataset.m&&el.dataset.k){
+    const m=S.massifs.find(m=>m.id===el.dataset.m);
+    m[el.dataset.k]=el.dataset.k==="nom"?el.value:num(el.value);
+  }else if(el.dataset.p&&el.dataset.k){
+    const p=S.plantes.find(p=>p.id===el.dataset.p);
+    p[el.dataset.k]=["nom","cond"].includes(el.dataset.k)?el.value:num(el.value);
+    if(el.dataset.k==="prix") S.exemple=false;
+  }else return;
+  save(); calc();
+});
+document.addEventListener("change",e=>{
+  const el=e.target;
+  if(el.dataset.p&&el.dataset.k==="nom"){rendreMassifs();calc()}
+});
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-act]"); if(!b)return;
+  const a=b.dataset.act;
+  if(a==="egal"){
+    const m=S.massifs.find(x=>x.id===b.dataset.m), n=S.plantes.length; if(!n)return;
+    const base=Math.floor(100/n); m.rep={};
+    S.plantes.forEach((p,i)=>m.rep[p.id]=base+(i<100-base*n?1:0));
+  }else if(a==="delM"){
+    S.massifs=S.massifs.filter(x=>x.id!==b.dataset.m);
+  }else if(a==="delP"){
+    S.plantes=S.plantes.filter(x=>x.id!==b.dataset.p);
+    S.massifs.forEach(m=>delete m.rep[b.dataset.p]);
+    rendrePalette();
+  }
+  save(); rendreMassifs(); calc();
+});
+$("addMassif").addEventListener("click",()=>{
+  S.massifs.push({id:nid("m"),nom:"Massif "+(S.massifs.length+1),surface:0,rep:{}});
+  save(); rendreMassifs(); calc();
+  const last=S.massifs[S.massifs.length-1]; $("surf-"+last.id)?.focus();
+});
+$("addPlante").addEventListener("click",()=>{
+  const p={id:nid("p"),nom:"",dens:4,cond:"C2",prix:0};
+  S.plantes.push(p); save(); rendrePalette(); rendreMassifs(); calc(); $("pn-"+p.id).focus();
+});
+function deuxTemps(btn,label,action){
+  let arme=false,t;
+  btn.addEventListener("click",()=>{
+    if(!arme){arme=true;btn.textContent="Toucher à nouveau pour confirmer";btn.classList.add("confirm");
+      t=setTimeout(()=>{arme=false;btn.textContent=label;btn.classList.remove("confirm")},3500);return}
+    clearTimeout(t);arme=false;btn.textContent=label;btn.classList.remove("confirm");action();
+  });
+}
+deuxTemps($("nouveau"),"Nouveau projet vide",()=>{S=vide();save();toutRendre();window.scrollTo({top:0})});
+deuxTemps($("exemple"),"Recharger l'exemple",()=>{S=exemple();save();toutRendre();window.scrollTo({top:0})});
+
+$("copier").addEventListener("click",async e=>{
+  const R=dernier, b=e.currentTarget, L=[];
+  const n2=x=>String(Math.round(x*100)/100).replace(".",",");
+  L.push(S.nom); L.push("");
+  L.push(["Poste","Conditionnement","Quantité","Unité","P.U. HT","Total HT"].join("\t"));
+  R.lignes.forEach(l=>L.push([l.p.nom,l.p.cond,l.q,"u",n2(num(l.p.prix)),n2(l.ht)].join("\t")));
+  L.push([S.paillage.type+" "+num(S.paillage.ep)+" cm","",n2(R.vPaill),"m³",n2(num(S.paillage.prix)),n2(R.htPaill)].join("\t"));
+  L.push([S.amend.type+" "+num(S.amend.ep)+" cm","",n2(R.vAmend),"m³",n2(num(S.amend.prix)),n2(R.htAmend)].join("\t"));
+  if(num(S.tauxH)>0) L.push(["Main-d'œuvre plantation","",n2(R.heures),"h",n2(num(S.tauxH)),n2(R.htMO)].join("\t"));
+  L.push(["Total HT","","","","",n2(R.ht)].join("\t"));
+  L.push(["TVA "+num(S.tva)+" %","","","","",n2(R.tva)].join("\t"));
+  L.push(["Total TTC","","","","",n2(R.ttc)].join("\t"));
+  L.push(""); L.push(["Massif","Surface m²","Plants"].join("\t"));
+  R.massifs.forEach(x=>L.push([x.m.nom,n2(x.surf),x.n].join("\t")));
+  const txt=L.join("\n");
+  try{await navigator.clipboard.writeText(txt);b.textContent="Copié"}
+  catch(_){
+    const ta=document.createElement("textarea");ta.value=txt;ta.style.position="fixed";ta.style.opacity="0";document.body.appendChild(ta);ta.select();
+    let ok=false;try{ok=document.execCommand("copy")}catch(e){}
+    ta.remove(); b.textContent=ok?"Copié":"Copie impossible";
+  }
+  setTimeout(()=>b.textContent="Copier pour Excel",2000);
+});
+
+toutRendre();
+if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}))}
+</script>
+</body>
+</html>
